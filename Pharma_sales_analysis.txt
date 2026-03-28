@@ -1,0 +1,82 @@
+CREATE DATABASE Pharma_db;
+USE Pharma_db;
+CREATE TABLE pharma_sales (
+    Date DATE,
+    Year INT,
+    Month INT,
+    Day INT,
+    Region VARCHAR(50),
+    Country VARCHAR(50),
+    Category VARCHAR(100),
+    Medicine VARCHAR(100),
+    Age_group VARCHAR(50),
+    Units_sold INT,
+    Unit_price DECIMAL(10,2),
+    Stock_level INT,
+    Expiry_days_remaining INT,
+    Covid_flag VARCHAR(10)
+);
+LOAD DATA LOCAL INFILE 'C:/Users/KIRTI GUPTA/Desktop/Global/Dataset/Pharmasales_cleaned.csv'
+INTO TABLE pharma_sales
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
+IGNORE 1 ROWS
+(@Date, Year, Month, Day, Region, Country, Category, Medicine, Age_group, Units_sold, Unit_price, Stock_level, Expiry_days_remaining, Covid_flag)
+SET Date = STR_TO_DATE(@Date, '%d-%m-%Y');
+SELECT COUNT(*) FROM pharma_sales;
+CREATE VIEW pharma_base AS
+SELECT 
+    *,
+    Units_sold * Unit_price AS revenue
+FROM pharma_sales;
+SELECT 
+    Year, Month, SUM(revenue) AS total_revenue
+FROM
+    pharma_base
+GROUP BY Year , Month
+ORDER BY Year , Month;
+SELECT 
+    Year,
+    Month,
+    SUM(revenue) AS revenue,
+    LAG(SUM(revenue)) OVER (ORDER BY Year, Month) AS prev_month_revenue
+FROM pharma_base
+GROUP BY Year, Month;
+SELECT 
+    Year,
+    Month,
+    revenue,
+    LAG(revenue) OVER (ORDER BY Year, Month) AS prev_month_revenue,
+    ((revenue - LAG(revenue) OVER (ORDER BY Year, Month)) 
+        / LAG(revenue) OVER (ORDER BY Year, Month)) * 100 AS growth_pct
+FROM (
+    SELECT 
+        Year,
+        Month,
+        SUM(revenue) AS revenue
+    FROM pharma_base
+    GROUP BY Year, Month
+) AS monthly_data;
+SELECT 
+    Region,
+    SUM(revenue) AS total_revenue
+FROM pharma_base
+GROUP BY Region
+ORDER BY total_revenue DESC;
+SELECT 
+    Region,
+    SUM(Units_sold) AS demand,
+    SUM(Stock_level) AS stock
+FROM pharma_base
+GROUP BY Region
+ORDER BY stock ASC;
+SELECT 
+    Medicine,
+    Region,
+    SUM(Units_sold) AS demand,
+    SUM(Stock_level) AS stock,
+    AVG(Expiry_days_remaining) AS expiry
+FROM pharma_base
+GROUP BY Medicine, Region
+ORDER BY stock DESC;
